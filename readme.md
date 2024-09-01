@@ -1,6 +1,6 @@
 # Minesweeper
 
-This is a Minesweeper API that includes an example front-end. It is inspired by the Stake Mine game. 
+This is a Minesweeper API that includes an example front-end. It is inspired by the Stake Mine game. I wrote this repository around one hour. So, please don't judge me :) 
 
 
 ## Requirements
@@ -23,6 +23,6 @@ go mod tidy
 
 3. Run the application:
 ```
-go run main.go
+go run ./cmd/main.go
 ```
 
