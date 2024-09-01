@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Minesweeper</title>
+    <style>
+      /* styles.css */
+      body {
+        font-family: Arial, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f0f0;
+      }
+
+      #game {
+        text-align: center;
+      }
+
+      #controls {
+        margin-bottom: 20px;
+      }
+
+      #game-board {
+        display: grid;
+        grid-template-columns: repeat(5, 60px);
+        grid-template-rows: repeat(5, 60px);
+        gap: 5px;
+        margin-bottom: 20px;
+      }
+
+      .cell {
+        width: 60px;
+        height: 60px;
+        background-color: #ccc;
+        border: 1px solid #999;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        font-size: 18px;
+      }
+
+      .cell.revealed {
+        background-color: #2ecc71;
+        cursor: default;
+      }
+
+      .cell.mine-filled {
+        background-color: #f39c12;
+      }
+
+      .cell.mine {
+        background-color: red;
+      }
+
+      #game-info {
+        margin-top: 20px;
+      }
+
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game">
+      <div id="controls">
+        <label for="mines">Select Number of Mines:</label>
+        <input type="number" id="mines" min="1" max="24" value="5" />
+        <button id="start-btn">Start Game</button>
+      </div>
+      <div id="game-board"></div>
+      <div id="game-info">
+        <button id="reset-btn" disabled>Reset Game</button>
+        <p id="status">Click "Start Game" to begin!</p>
+      </div>
+    </div>
+
+    <script>
+      const ROWS = 5;
+      const COLUMNS = 5;
+      let gameID = null;
+      let gameOver = false;
+
+      document.addEventListener("DOMContentLoaded", () => {
+        document
+          .getElementById("start-btn")
+          .addEventListener("click", startGame);
+        document
+          .getElementById("reset-btn")
+          .addEventListener("click", resetGame);
+      });
+
+      function startGame() {
+        const mines = parseInt(document.getElementById("mines").value);
+        if (isNaN(mines) || mines < 1 || mines >= ROWS * COLUMNS) {
+          updateStatus("Please enter a valid number of mines.");
+          return;
+        }
+
+        fetch(`http://localhost:8080/v1/mine?mines=${mines}`, {
+          method: "POST",
+        })
+          .then((response) => response.json())
+          .then((resp) => {
+            gameID = resp.data.id;
+            gameOver = resp.data.game_over;
+            initBoard();
+            updateStatus("Game started! Click a cell to reveal it.");
+            document.getElementById("reset-btn").disabled = false;
+          })
+          .catch((error) => console.error("Error:", error));
+      }
+
+      function initBoard() {
+        const gameBoard = document.getElementById("game-board");
+        gameBoard.innerHTML = ""; // Clear previous board
+
+        for (let row = 0; row < ROWS; row++) {
+          for (let col = 0; col < COLUMNS; col++) {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.dataset.row = row;
+            cell.dataset.col = col;
+            cell.addEventListener("click", () => onCellClick(row, col));
+            gameBoard.appendChild(cell);
+          }
+        }
+      }
+
+      function onCellClick(row, col) {
+        if (gameOver || !gameID) return;
+        const cell = document.querySelector(
+          `.cell[data-row='${row}'][data-col='${col}']`
+        );
+        if (cell.classList.contains("revealed")) return; // Already revealed
+
+        fetch(
+          `http://localhost:8080/v1/mine?game_id=${gameID}&x=${row}&y=${col}`
+        )
+          .then((response) => response.json())
+          .then((resp) => handleMoveResponse(resp, cell))
+          .catch((error) => console.error("Error:", error));
+      }
+
+      function handleMoveResponse(resp, cell) {
+        if (resp.success) {
+          if (resp.data.game_over) {
+            gameOver = true;
+            cell.classList.add("mine");
+            updateStatus("Game Over! You hit a mine.");
+            revealAllMines(resp.data.board);
+          } else {
+            cell.classList.add("revealed");
+            updateStatus("Win Multiplier: " + resp.data.payout);
+          }
+        }
+      }
+
+      // mines : [[y], [y], [y], [y]]
+      function revealAllMines(mines) {
+        for (let i = 0; i < mines.length; i++) {
+          for (let j = 0; j < mines[i].length; j++) {
+            const cell = document.querySelector(
+              `.cell[data-row='${i}'][data-col='${j}']`
+            );
+            if (mines[i][j] === true) {
+              cell.classList.add("mine-filled");
+            }
+          }
+        }
+      }
+
+      function updateStatus(message) {
+        document.getElementById("status").textContent = message;
+      }
+
+      function resetGame() {
+        gameID = null;
+        gameOver = false;
+        updateStatus("Click 'Start Game' to begin!");
+        document.getElementById("reset-btn").disabled = true;
+        initBoard();
+      }
+    </script>
+  </body>
+</html>
